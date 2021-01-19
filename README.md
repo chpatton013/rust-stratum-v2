@@ -30,3 +30,12 @@ Documentation can be built locally using cargo:
 ```
 cargo doc --no-deps --open
 ```
+
+## Examples
+
+Examples of the using the library can be found at `example/`. We can run particular
+examples:
+
+```
+cargo run --example <example_file_name>
+```
