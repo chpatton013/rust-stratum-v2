@@ -53,10 +53,9 @@ impl OpenStandardMiningChannel {
     ///
     /// let open_channel = mining::OpenStandardMiningChannel::new(
     ///     1,
-    ///     "braiinstest.worker1".to_string(),
+    ///     "braiinstest.worker1",
     ///     12.3,
     ///     [0u8; 32],
-    ///
     /// );
     ///
     /// assert!(open_channel.is_ok());
@@ -73,6 +72,19 @@ impl OpenStandardMiningChannel {
             nominal_hash_rate,
             max_target,
         })
+    }
+}
+
+impl Serializable for OpenStandardMiningChannel {
+    fn serialize<W: io::Write>(&self, writer: &mut W) -> Result<usize> {
+        let buffer = serialize!(
+            &self.request_id.to_le_bytes(),
+            &self.user_identity.as_bytes(),
+            &self.nominal_hash_rate.to_le_bytes(),
+            &self.max_target
+        );
+
+        Ok(writer.write(&buffer)?)
     }
 }
 
@@ -406,26 +418,6 @@ mod setup_connection_tests {
 }
 
 #[cfg(test)]
-mod open_standard_mining_tests {
-    use super::*;
-
-    #[test]
-    fn new_open_standard_mining_channel_0() {
-        // TODO: Substitute the nominal hash rate with something more accurate.
-        let target = [0u8; 32];
-
-        let message =
-            OpenStandardMiningChannel::new(1, "braiinstest.worker1".to_string(), 12.3, target)
-                .unwrap();
-
-        assert_eq!(message.request_id, 1);
-        assert_eq!(message.user_identity, "braiinstest.worker1");
-        assert_eq!(message.nominal_hash_rate, 12.3);
-        assert_eq!(message.max_target.len(), 32);
-    }
-}
-
-#[cfg(test)]
 mod connection_success_tests {
     use super::*;
 
@@ -638,5 +630,47 @@ mod connection_error_tests {
             0xff, 0xff, 0xff, 0x72, 0x65, 0x2d, 0x66, 0x6c, 0x61, 0x67, 0x73, // error_code
         ];
         assert!(SetupConnectionError::deserialize(&input).is_err());
+    }
+}
+
+#[cfg(test)]
+mod open_standard_mining_tests {
+    use super::*;
+
+    #[test]
+    fn init_open_standard_mining_channel() {
+        // TODO: Substitute the nominal hash rate with something more accurate.
+        let target = [0u8; 32];
+
+        let message =
+            OpenStandardMiningChannel::new(1, "braiinstest.worker1".to_string(), 12.3, target)
+                .unwrap();
+
+        assert_eq!(message.request_id, 1);
+        assert_eq!(message.user_identity, "braiinstest.worker1");
+        assert_eq!(message.nominal_hash_rate, 12.3);
+        assert_eq!(message.max_target.len(), 32);
+    }
+
+    #[test]
+    fn serialize_open_standard_mining_channel() {
+        let message =
+            OpenStandardMiningChannel::new(1, "braiinstest.worker1".to_string(), 12.3, [0u8; 32])
+                .unwrap();
+
+        let mut output = Vec::new();
+        message.serialize(&mut output).unwrap();
+
+        let expected = [
+            0x01, 0x00, 0x00, 0x00, // request_id
+            0x13, // user_identity length
+            0x62, 0x72, 0x61, 0x69, 0x69, 0x6e, 0x73, 0x74, 0x65, 0x73, 0x74, 0x2e, 0x77, 0x6f,
+            0x72, 0x6b, 0x65, 0x72, 0x31, // user_identity
+            0xcd, 0xcc, 0x44, 0x41, // nominal_hash_rate
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, // max_target
+        ];
+        assert_eq!(output, expected)
     }
 }
