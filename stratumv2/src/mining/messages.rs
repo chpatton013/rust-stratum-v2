@@ -27,7 +27,7 @@ pub struct OpenStandardMiningChannel {
     pub request_id: u32,
 
     /// Used to identify/authenticate the Client by the upstream Server.
-    pub user_identity: String,
+    pub user_identity: STR0_255,
 
     /// Identifies the hash rate per second [h/s] of the device (or the
     /// cumulative hashrate per second of the channel if multiple devices are
@@ -59,19 +59,20 @@ impl OpenStandardMiningChannel {
     ///
     /// );
     ///
-    /// assert_eq!(open_channel.request_id, 1);
-    pub fn new(
+    /// assert!(open_channel.is_ok());
+    /// assert_eq!(open_channel.unwrap().request_id, 1);
+    pub fn new<T: Into<String>>(
         request_id: u32,
-        user_identity: String,
+        user_identity: T,
         nominal_hash_rate: f32,
         max_target: U256,
-    ) -> OpenStandardMiningChannel {
-        OpenStandardMiningChannel {
+    ) -> Result<OpenStandardMiningChannel> {
+        Ok(OpenStandardMiningChannel {
             request_id,
-            user_identity,
+            user_identity: STR0_255::new(user_identity.into())?,
             nominal_hash_rate,
             max_target,
-        }
+        })
     }
 }
 
@@ -414,7 +415,8 @@ mod open_standard_mining_tests {
         let target = [0u8; 32];
 
         let message =
-            OpenStandardMiningChannel::new(1, "braiinstest.worker1".to_string(), 12.3, target);
+            OpenStandardMiningChannel::new(1, "braiinstest.worker1".to_string(), 12.3, target)
+                .unwrap();
 
         assert_eq!(message.request_id, 1);
         assert_eq!(message.user_identity, "braiinstest.worker1");
