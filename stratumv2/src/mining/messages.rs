@@ -21,14 +21,46 @@ impl_setup_connection_error!(SetupConnectionFlags);
 /// channel to the upstream server. A standard mining channel indicates `header-only`
 /// mining.
 pub struct OpenStandardMiningChannel {
+    /// Client specific identifier to match responses from the upstream Server.
+    /// The request_id MUST be unique for all connections and is not interpreted
+    /// by the server.
     pub request_id: u32,
+
+    /// Used to identify/authenticate the Client by the upstream Server.
     pub user_identity: String,
+
+    /// Identifies the hash rate per second [h/s] of the device (or the
+    /// cumulative hashrate per second of the channel if multiple devices are
+    /// connected downstream).
+    ///
+    /// Depending on the upstream Servers target setting policy, this value
+    /// can be used to set a certain target for the channel.
     pub nominal_hash_rate: f32,
+
+    /// Identifies the Maximum target range that the connected device (Client)
+    /// can accept. The Server MUST accept the target or respond by sending a
+    /// [OpenMiningChannel.Error](struct.OpenMiningChannelError.html) message.
     pub max_target: U256,
 }
 
 impl OpenStandardMiningChannel {
-    fn new(
+    /// Construct for the OpenStandardMiningChannel message.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use stratumv2::mining;
+    ///
+    /// let open_channel = mining::OpenStandardMiningChannel::new(
+    ///     1,
+    ///     "braiinstest.worker1".to_string(),
+    ///     12.3,
+    ///     [0u8; 32],
+    ///
+    /// );
+    ///
+    /// assert_eq!(open_channel.request_id, 1);
+    pub fn new(
         request_id: u32,
         user_identity: String,
         nominal_hash_rate: f32,
