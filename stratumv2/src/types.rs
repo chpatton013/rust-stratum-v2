@@ -47,6 +47,20 @@ impl PartialEq<STR0_255> for String {
     }
 }
 
+/// PartialEq implementation allowing direct comparison between STR0_255 and
+/// &str.
+impl PartialEq<&str> for STR0_255 {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialEq<STR0_255> for &str {
+    fn eq(&self, other: &STR0_255) -> bool {
+        *self == other.0
+    }
+}
+
 /// PartialEq implementation allowing direct comparison between STR0_255 types.
 impl PartialEq<STR0_255> for STR0_255 {
     fn eq(&self, other: &STR0_255) -> bool {
