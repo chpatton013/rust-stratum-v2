@@ -4,6 +4,7 @@ use crate::mining::{SetupConnectionFlags, SetupConnectionSuccessFlags};
 use crate::types::{MessageTypes, STR0_255, U256};
 use crate::{BitFlag, Deserializable, Framable, Protocol, Serializable};
 use std::borrow::Cow;
+use std::convert::TryInto;
 use std::{io, str};
 
 // Implementation of the SetupConenction message for the Mining Protocol.
@@ -85,6 +86,82 @@ impl Serializable for OpenStandardMiningChannel {
         );
 
         Ok(writer.write(&buffer)?)
+    }
+}
+
+impl Deserializable for OpenStandardMiningChannel {
+    fn deserialize(bytes: &[u8]) -> Result<Self> {
+        // Get the request_id.
+        let start = 0;
+        let offset = 4;
+
+        let request_id_bytes = bytes.get(start..offset);
+        if request_id_bytes.is_none() {
+            return Err(Error::DeserializationError(
+                "request_id is missing from OpenStandardMiningChannel message".into(),
+            ));
+        }
+
+        let request_id = (request_id_bytes.unwrap()[3] as u32) << 24
+            | (request_id_bytes.unwrap()[2] as u32) << 16
+            | (request_id_bytes.unwrap()[1] as u32) << 8
+            | (request_id_bytes.unwrap()[0] as u32);
+
+        // Get the user_identity length.
+        let mut start = offset;
+        let user_identity_length = &bytes.get(start);
+        if user_identity_length.is_none() {
+            return Err(Error::DeserializationError(
+                "user identity length is missing from OpenStandardMiningChannel message".into(),
+            ));
+        }
+
+        // Get the user_identity.
+        start += 1;
+        let offset = start + *user_identity_length.unwrap() as usize;
+        let user_identity = &bytes.get(start..offset);
+        if user_identity.is_none() {
+            return Err(Error::DeserializationError(
+                "user_identity is missing from OpenStandardMiningChannel message".into(),
+            ));
+        }
+
+        // Get the nominal_hash_rate.
+        let start = offset as usize;
+        let offset = start + 4;
+        let nominal_hash_rate_bytes = &bytes.get(start..offset);
+        if nominal_hash_rate_bytes.is_none() {
+            return Err(Error::DeserializationError(
+                "nominal_hash_rate is missing from OpenStandardMiningChannel message".into(),
+            ));
+        }
+
+        let nominal_hash_rate = f32::from_bits(
+            (nominal_hash_rate_bytes.unwrap()[3] as u32) << 24
+                | (nominal_hash_rate_bytes.unwrap()[2] as u32) << 16
+                | (nominal_hash_rate_bytes.unwrap()[1] as u32) << 8
+                | (nominal_hash_rate_bytes.unwrap()[0] as u32),
+        );
+
+        // Get the max target (we will assume it sent as littlendian but also
+        // represented as little endian using U256).
+        let start = offset;
+        let offset = start + 32;
+        let max_target_bytes = &bytes.get(start..offset);
+        if max_target_bytes.is_none() {
+            return Err(Error::DeserializationError(
+                "max_target is missing from OpenStandardMiningChannel message".into(),
+            ));
+        }
+
+        Ok(OpenStandardMiningChannel::new(
+            request_id,
+            str::from_utf8(user_identity.unwrap())?,
+            nominal_hash_rate as f32,
+            // NOTE: Need to review, I think the final unwrap() is safe due to
+            // asserting the size of the slice in max_target_bytes.
+            max_target_bytes.unwrap().try_into().unwrap(),
+        )?)
     }
 }
 
@@ -672,5 +749,25 @@ mod open_standard_mining_tests {
             0x00, 0x00, 0x00, 0x00, // max_target
         ];
         assert_eq!(output, expected)
+    }
+
+    #[test]
+    fn deserialize_open_standard_mining_channel() {
+        let input = [
+            0x01, 0x00, 0x00, 0x00, // request_id
+            0x13, // user_identity length
+            0x62, 0x72, 0x61, 0x69, 0x69, 0x6e, 0x73, 0x74, 0x65, 0x73, 0x74, 0x2e, 0x77, 0x6f,
+            0x72, 0x6b, 0x65, 0x72, 0x31, // user_identity
+            0xcd, 0xcc, 0x44, 0x41, // nominal_hash_rate
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, // max_target
+        ];
+
+        let message = OpenStandardMiningChannel::deserialize(&input).unwrap();
+        assert_eq!(message.request_id, 1);
+        assert_eq!(message.user_identity, "braiinstest.worker1");
+        assert_eq!(message.nominal_hash_rate, 12.3);
+        assert_eq!(message.max_target.len(), 32);
     }
 }
